@@ -10,7 +10,6 @@ SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 SCREEN_TITLE = "Пин Понг!"
 
-
 class MyGame(arcade.Window):
     def __init__(self, width, height, title):
         super().__init__(width, height, title)
@@ -18,43 +17,37 @@ class MyGame(arcade.Window):
 
     def setup(self):
         # Создаём игрока
-        self.player = arcade.Sprite(":resources:images/animated_characters/female_person/femalePerson_idle.png", 0.5)
-        self.player.center_x = 100
-        self.player.center_y = 200
-        self.player_speed_x = 5
-        self.player_speed_y = -1
+        self.ball = arcade.Sprite(":resources:images/pinball/pool_cue_ball.png", 0.5)
+        self.player1 = arcade.Sprite(":resources:images/pinball/pool_cue_ball.png", 0.5)
+        self.player2 = arcade.Sprite(":resources:images/pinball/pool_cue_ball.png", 0.5)
+        self.player1.center_x = 200
+        self.player1.center_y = 200
+        self.player2.center_x = 300
+        self.player2.center_y = 200
+        self.ball.center_x = 200
+        self.ball.center_y = 300
+        self.ball.change_x = 3
+        self.ball.change_y = -4
         
         self.player_list = arcade.SpriteList()
-        self.player_list.append(self.player)
+        self.balll = arcade.SpriteList()
+        self.balll.append(self.ball)
+        self.player_list.append(self.player1)
+        self.player_list.append(self.player2)
         
-        
-        # Создаём стены (вернее, пол в этом конкретном случае)
-        self.wall_list = arcade.SpriteList()
-        for x in range(0, 1000, 64):
-            wall = arcade.Sprite(":resources:images/tiles/grassMid.png", 0.5)
-            wall.center_x = x
-            wall.center_y = 32
-            self.wall_list.append(wall)
-        
-        # Создаём физический движок
-        self.physics_engine = arcade.PhysicsEngineSimple(
-            self.player, 
-            self.wall_list
-        )
-
     def on_update(self, delta_time):
-        # Обновляем физический движок
-        self.physics_engine.update()
-        
-        # Обновляем движение игрока
-        self.player.change_x = self.player_speed_x
-        self.player.change_y = self.player_speed_y
+        self.ball.update()
 
-    def on_draw(self):
+        if self.ball.top > SCREEN_HEIGHT or self.ball.bottom < 0:
+            self.ball.change_y *= -1
+        if self.ball.right > SCREEN_WIDTH or self.ball.left < 0:
+            self.ball.change_x *= -1
+
+    def on_draw(self): 
         """Отрисовка всех спрайтов"""
         self.clear()
         self.player_list.draw()
-        self.wall_list.draw()
+        self.balll.draw()
 
 def main():
     game = MyGame(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
