@@ -50,10 +50,10 @@ class MyGame(arcade.Window):
             
         if arcade.check_for_collision(self.ball, self.player1):
             self.collisions(self.player1)
-            self.p_s += 0.01
+            self.p_s *= 1.02
         if arcade.check_for_collision(self.ball, self.player2):
             self.collisions(self.player2)
-            self.p_s += 0.01
+            self.p_s *= 1.02
 
     def on_draw(self): 
         """Отрисовка всех спрайтов"""
