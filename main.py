@@ -52,16 +52,16 @@ class MyGame(arcade.Window):
         self.main_text2 = arcade.Text("Его очки: " + str(self.P2), SCREEN_WIDTH - 200, SCREEN_HEIGHT / 3 + 250,
                                      arcade.color.BLUE_GRAY, font_size=20, anchor_x="center", batch=self.batch)
         
-        
+
         if self.ball.top > SCREEN_HEIGHT or self.ball.bottom < 0:
             self.ball.change_y *= -1
         if self.ball.right > SCREEN_WIDTH:
-            time.sleep(1)
+            time.sleep(0.5)
             self.P1 += 1
             self.restart()
         elif self.ball.left < 0:
             self.P2 += 1
-            time.sleep(1)
+            time.sleep(0.5)
             self.restart()
             
         if arcade.check_for_collision(self.ball, self.player1):
@@ -70,6 +70,14 @@ class MyGame(arcade.Window):
         if arcade.check_for_collision(self.ball, self.player2):
             self.collisions(self.player2)
             self.p_s *= 1.03
+        if self.player1.bottom <= 0:
+            self.player1.change_y = 0
+        if self.player1.top >= SCREEN_HEIGHT:
+            self.player1.change_y = 0
+        if self.player2.bottom <= 0:
+            self.player2.change_y = 0
+        if self.player2.top >= SCREEN_HEIGHT:
+            self.player2.change_y = 0
             
 
     def on_draw(self): 
@@ -109,6 +117,8 @@ class MyGame(arcade.Window):
         self.ball.center_y = 250
         self.ball.change_x = [-4, 4][random.randint(0, 1)]
         self.ball.change_y = random.randint(-3, 3)
+        if self.ball.change_y <= 0.9 and self.ball.change_y >= -0.9:
+            self.ball.change_y = random.randint(-0.9, -3)
         self.p_s = 3
         print(f"{self.ball.change_x}/{self.ball.change_y}")
        
@@ -128,6 +138,7 @@ class MyGame(arcade.Window):
         if abs(self.ball.change_x) > MAX_SPEED_X:
             self.ball.change_x = MAX_SPEED_X if self.ball.change_x > 0 else -MAX_SPEED_X
 
+
         
 def main():
     game = MyGame(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
@@ -137,6 +148,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-#нуу сомнительно, но окей
-#                           @Google Ai
-#okk
