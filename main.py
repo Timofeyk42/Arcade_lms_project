@@ -1,5 +1,7 @@
 import arcade
 import time
+import random
+
 #Задачи:
 #Написать локально для 2 игроков
 #Разобраться с физикой
@@ -25,8 +27,8 @@ class MyGame(arcade.Window):
         self.player2.center_y = 250
         self.ball.center_x = 200
         self.ball.center_y = 300
-        self.ball.change_x = 4
-        self.ball.change_y = -2
+        self.ball.change_x = [-4, 4][random.randint(0, 1)]
+        self.ball.change_y = random.randint(-2, 2)
         
         self.player_list = arcade.SpriteList()
         self.balll = arcade.SpriteList()
@@ -49,10 +51,10 @@ class MyGame(arcade.Window):
             
         if arcade.check_for_collision(self.ball, self.player1):
             self.collisions(self.player1)
-            self.p_s *= 1.02
+            self.p_s *= 1.03
         if arcade.check_for_collision(self.ball, self.player2):
             self.collisions(self.player2)
-            self.p_s *= 1.02
+            self.p_s *= 1.03
 
     def on_draw(self): 
         """Отрисовка всех спрайтов"""
@@ -85,10 +87,12 @@ class MyGame(arcade.Window):
         self.player1.center_y = 250
         self.player2.center_x = 900
         self.player2.center_y = 250
-        self.ball.center_x = 200
-        self.ball.center_y = 300
-        self.ball.change_x = 4
-        self.ball.change_y = -2
+        self.ball.center_x = 500
+        self.ball.center_y = 250
+        self.ball.change_x = [-4, 4][random.randint(0, 1)]
+        self.ball.change_y = random.randint(-3, 3)
+        self.p_s = 3
+        print(f"{self.ball.change_x}/{self.ball.change_y}")
     
     def collisions(self, paddle):
         if paddle.center_x < SCREEN_WIDTH / 2:
@@ -96,7 +100,7 @@ class MyGame(arcade.Window):
         else:
             self.ball.center_x = paddle.left - self.ball.width / 2
         self.ball.change_x = -self.ball.change_x
-        self.ball.change_y += paddle.change_y * 0.3
+        self.ball.change_y += paddle.change_y * 0.4
         self.ball.change_y = max(-7.0, min(7.0, self.ball.change_y))
         speed_factor = 1.03
         self.ball.change_x *= speed_factor
