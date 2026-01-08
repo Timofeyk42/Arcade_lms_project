@@ -1,7 +1,7 @@
 import arcade
 import time
 import random
-
+from pyglet.graphics import Batch
 #Задачи:
 #Написать локально для 2 игроков
 #Разобраться с физикой
@@ -15,6 +15,7 @@ class MyGame(arcade.Window):
     def __init__(self, width, height, title):
         super().__init__(width, height, title)
         arcade.set_background_color(arcade.color.ASH_GREY)
+      
 
     def setup(self):
         # Создаём игрока
@@ -36,16 +37,30 @@ class MyGame(arcade.Window):
         self.player_list.append(self.player1)
         self.player_list.append(self.player2)
         self.p_s = 3
+
+        self.P1 = 0
+        self.P2 = 0
         
     def on_update(self, delta_time):
         self.ball.update()
         self.player1.update()
         self.player2.update()
 
-
+        self.batch = Batch()
+        self.main_text1 = arcade.Text("Твои очки: " + str(self.P1), SCREEN_WIDTH / 5 - 20, SCREEN_HEIGHT / 3 + 250,
+                                     arcade.color.BLUE_GRAY, font_size=20, anchor_x="center", batch=self.batch)
+        self.main_text2 = arcade.Text("Его очки: " + str(self.P2), SCREEN_WIDTH - 200, SCREEN_HEIGHT / 3 + 250,
+                                     arcade.color.BLUE_GRAY, font_size=20, anchor_x="center", batch=self.batch)
+        
+        
         if self.ball.top > SCREEN_HEIGHT or self.ball.bottom < 0:
             self.ball.change_y *= -1
-        if self.ball.right > SCREEN_WIDTH or self.ball.left < 0:
+        if self.ball.right > SCREEN_WIDTH:
+            time.sleep(1)
+            self.P1 += 1
+            self.restart()
+        elif self.ball.left < 0:
+            self.P2 += 1
             time.sleep(1)
             self.restart()
             
@@ -55,13 +70,16 @@ class MyGame(arcade.Window):
         if arcade.check_for_collision(self.ball, self.player2):
             self.collisions(self.player2)
             self.p_s *= 1.03
+            
 
     def on_draw(self): 
         """Отрисовка всех спрайтов"""
         self.clear()
         self.player_list.draw()
         self.balll.draw()
-    
+        self.batch.draw()
+
+
     def on_key_press(self, key, modifiers):
         if key == arcade.key.S:
             self.player1.change_y = -self.p_s
@@ -93,7 +111,9 @@ class MyGame(arcade.Window):
         self.ball.change_y = random.randint(-3, 3)
         self.p_s = 3
         print(f"{self.ball.change_x}/{self.ball.change_y}")
-    
+       
+
+
     def collisions(self, paddle):
         if paddle.center_x < SCREEN_WIDTH / 2:
             self.ball.center_x = paddle.right + self.ball.width / 2
