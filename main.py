@@ -2,6 +2,7 @@ import arcade
 import time
 import random
 from pyglet.graphics import Batch
+import socketio
 #Задачи:
 #Написать локально для 2 игроков
 #Разобраться с физикой
@@ -12,7 +13,23 @@ SCREEN_HEIGHT = 500
 SCREEN_TITLE = "Пин Понг!"
 
 
-# class MenuView(arcade.View):
+sio = socketio.Client()
+
+@sio.event
+def connect():
+    print("Подключились к серверу")
+    sio.emit('join', 'player1')
+
+@sio.event
+def message(data):
+    print(f"📩 Получено сообщение: {data}")
+
+@sio.event
+def disconnect():
+    print("Отключились от сервера")
+
+
+# class MenuView(arcade.View): ТЫ В КОМЕНТАХ К КОМИТУ НАПИСАЛ РОКЕТКИ АХАХАХАХАХХАХАХАХАХАХАХАХАХАХАХАХАХХАХАХАХАХАХА
 #     def __init__(self):
 #         super().__init__()
 
@@ -67,7 +84,11 @@ class MyGame(arcade.Window):
 
         self.P1 = 0
         self.P2 = 0
-        
+
+        sio.connect('http://127.0.0.1:5000')
+        time.sleep(0.5)
+
+
     def on_update(self, delta_time):
         self.ball.update()
         self.player1.update()
@@ -105,7 +126,8 @@ class MyGame(arcade.Window):
             self.player2.change_y = 0
         if self.player2.top >= SCREEN_HEIGHT:
             self.player2.change_y = 0
-            
+        
+        sio.emit("message", f"py:{self.player1.center_y}")
 
     def on_draw(self): 
         """Отрисовка всех спрайтов"""
@@ -151,9 +173,6 @@ class MyGame(arcade.Window):
         if self.ball.change_y <= 0.9 and self.ball.change_y >= -0.9:
             self.ball.change_y = random.randint(-0.9, -3)
         self.p_s = 3
-        print(f"{self.ball.change_x}/{self.ball.change_y}")
-       
-
 
     def collisions(self, paddle):
         if paddle.center_x < SCREEN_WIDTH / 2:
@@ -179,3 +198,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    sio.disconnect()
