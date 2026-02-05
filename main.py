@@ -14,6 +14,7 @@ class GameState:
     WAITING = 2
     PLAYING = 3
     SKIN_SELECT = 4
+    IP_INPUT = 5
 
 class PongGame(arcade.Window):
     def __init__(self):
@@ -41,6 +42,8 @@ class PongGame(arcade.Window):
         self.setup_socket_events()
         self.connection_status = "отключён"
         self.connection_error = None
+        self.server_ip = "127.0.0.1"
+        self.server_port = 8000
         
         # Игровые объекты
         self.ball = None
@@ -57,7 +60,11 @@ class PongGame(arcade.Window):
         # UI
         self.waiting_players = 1
         self.menu_selection = 0
-        self.menu_options = ["▶ Подключиться к серверу", "✏ Сменить ник", "🎨 Выбрать скин ракетки", "🚪 Выйти"]
+        self.menu_options = ["▶ Подключиться к серверу", "✏ Сменить ник", "🎨 Выбрать скин ракетки", "⚙️ Настройки сервера", "🚪 Выйти"]
+        self.ip_input_text = self.server_ip
+        self.ip_input_active = False
+        self.ip_input_cursor_visible = True
+        self.ip_input_cursor_time = 0
         
         # Предзагрузка текстур
         self.load_skin_textures()
@@ -86,7 +93,7 @@ class PongGame(arcade.Window):
             sprite.width = 15
             sprite.height = 100
         else:
-            # Используем SpriteSolidColor вместо устаревших функций рисования
+            # Используем SpriteSolidColor
             color = arcade.color.BLUE if is_player else arcade.color.RED
             sprite = arcade.SpriteSolidColor(15, 100, color)
         
@@ -103,7 +110,7 @@ class PongGame(arcade.Window):
         @self.sio.event
         def disconnect():
             self.connection_status = "отключён"
-            if self.game_state not in [GameState.MENU, GameState.SKIN_SELECT]:
+            if self.game_state not in [GameState.MENU, GameState.SKIN_SELECT, GameState.IP_INPUT]:
                 self.game_state = GameState.MENU
             print("❌ Отключено от сервера")
         
@@ -155,18 +162,33 @@ class PongGame(arcade.Window):
         try:
             self.game_state = GameState.CONNECTING
             self.connection_status = "подключение..."
-            self.sio.connect('http://127.0.0.1:8000', transports=['websocket'], wait=True, wait_timeout=5)
+            self.connection_error = None
+            
+            server_url = f"http://{self.server_ip}:{self.server_port}"
+            print(f"🔌 Подключение к {server_url}...")
+            
+            self.sio.connect(server_url, transports=['websocket'], wait=True, wait_timeout=5)
             time.sleep(0.3)
+            
             if self.sio.connected:
                 self.game_state = GameState.WAITING
-                self.connection_status = "подключён"
+                self.connection_status = f"подключён ({self.server_ip}:{self.server_port})"
+                print(f"✅ Успешно подключено к {server_url}")
                 return True
             else:
                 self.connection_error = "Таймаут подключения"
                 self.game_state = GameState.MENU
                 return False
+                
         except Exception as e:
-            self.connection_error = f"Ошибка: {str(e)[:50]}"
+            error_msg = str(e)
+            if "Connection refused" in error_msg or "connect call failed" in error_msg:
+                self.connection_error = "Сервер недоступен"
+            elif "Timeout" in error_msg:
+                self.connection_error = "Таймаут подключения"
+            else:
+                self.connection_error = f"Ошибка: {error_msg[:40]}"
+            
             print(f"❌ Ошибка подключения: {e}")
             self.game_state = GameState.MENU
             return False
@@ -184,35 +206,40 @@ class PongGame(arcade.Window):
             self.draw_waiting()
         elif self.game_state == GameState.PLAYING:
             self.draw_game()
+        elif self.game_state == GameState.IP_INPUT:
+            self.draw_ip_input()
         
-        # Индикатор подключения
+        # Индикатор подключения (в правом нижнем углу)
         status_color = arcade.color.GREEN if self.connection_status == "подключён" else arcade.color.RED
         arcade.draw_circle_filled(SCREEN_WIDTH - 20, 20, 8, status_color)
-        arcade.draw_text(self.connection_status, SCREEN_WIDTH - 100, 12, 
-                        arcade.color.WHITE, 12, anchor_x="right")
+        arcade.draw_text(self.connection_status, SCREEN_WIDTH - 40, 12, 
+                         arcade.color.WHITE, 12, anchor_x="right", anchor_y="center")
 
     def draw_menu(self):
         arcade.draw_text("🏓 СЕТЕВОЙ ПИН-ПОНГ", SCREEN_WIDTH/2, SCREEN_HEIGHT - 80,
-                        arcade.color.WHITE, 42, anchor_x="center", font_name="Arial")
+                        arcade.color.WHITE, 42, anchor_x="center", font_name="Arial", bold=True)
         
         for i, option in enumerate(self.menu_options):
             color = arcade.color.YELLOW if i == self.menu_selection else arcade.color.LIGHT_GRAY
             arcade.draw_text(option, SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - i*60,
                            color, 24, anchor_x="center", font_name="Arial")
         
-        arcade.draw_text(f"Ник: {self.username}", SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 80,
+        arcade.draw_text(f"Игрок: {self.username}", SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 80,
                        arcade.color.BLUE, 20, anchor_x="center")
         arcade.draw_text(f"Скин: {self.paddle_skins[self.selected_skin_index]['name']}", 
                        SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 50,
                        arcade.color.GREEN, 18, anchor_x="center")
+        arcade.draw_text(f"Сервер: {self.server_ip}:{self.server_port}", 
+                       SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 20,
+                       arcade.color.ORANGE, 16, anchor_x="center")
         
         if self.connection_error:
             arcade.draw_text(f"⚠️ {self.connection_error}", SCREEN_WIDTH/2, 50,
-                           arcade.color.RED, 16, anchor_x="center")
+                           arcade.color.RED, 16, anchor_x="center", bold=True)
 
     def draw_skin_select(self):
         arcade.draw_text("🎨 Выбор скина ракетки", SCREEN_WIDTH/2, SCREEN_HEIGHT - 80,
-                        arcade.color.WHITE, 36, anchor_x="center", font_name="Arial")
+                        arcade.color.WHITE, 36, anchor_x="center", font_name="Arial", bold=True)
         
         preview_y = SCREEN_HEIGHT // 2
         skin = self.paddle_skins[self.selected_skin_index]
@@ -226,16 +253,13 @@ class PongGame(arcade.Window):
                 texture
             )
         else:
-            # Используем современный метод рисования прямоугольника
+            # Стандартный прямоугольник для базового скина (СОВМЕСТИМЫЙ ВЫЗОВ)
             color = arcade.color.BLUE if self.selected_skin_index == 0 else arcade.color.PURPLE
-            # draw_xywh_rectangle_filled: x, y, width, height, color
-            arcade.draw_lbwh_rectangle_filled(
-                SCREEN_WIDTH // 2 - 30,  # x (левый нижний угол)
-                preview_y - 200,          # y (левый нижний угол)
-                60,                       # ширина
-                400,                      # высота
-                color
-            )
+            left = SCREEN_WIDTH // 2 - 30
+            right = left + 60
+            bottom = preview_y - 200
+            top = bottom + 400
+            arcade.draw_lrbt_rectangle_filled(left, right, bottom, top, color)
         
         arcade.draw_text(f"{skin['name']}", SCREEN_WIDTH/2, preview_y - 250,
                        arcade.color.WHITE, 28, anchor_x="center", bold=True)
@@ -245,34 +269,77 @@ class PongGame(arcade.Window):
         arcade.draw_text("ENTER/ESC : назад", SCREEN_WIDTH/2, 60,
                        arcade.color.DIM_GRAY, 16, anchor_x="center")
 
+    def draw_ip_input(self):
+        arcade.draw_text("⚙️ Настройки сервера", SCREEN_WIDTH/2, SCREEN_HEIGHT - 80,
+                        arcade.color.WHITE, 36, anchor_x="center", font_name="Arial", bold=True)
+        
+        arcade.draw_text("IP-адрес сервера:", SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 50,
+                        arcade.color.WHITE, 20, anchor_x="center")
+        
+        # Поле ввода IP (СОВМЕСТИМЫЕ ФУНКЦИИ РИСОВАНИЯ)
+        input_width = 400
+        input_height = 50
+        input_center_x = SCREEN_WIDTH / 2
+        input_center_y = SCREEN_HEIGHT / 2
+        
+        # Рамка поля ввода - СОВМЕСТИМЫЙ ВЫЗОВ
+        left = input_center_x - input_width / 2
+        right = input_center_x + input_width / 2
+        bottom = input_center_y - input_height / 2
+        top = input_center_y + input_height / 2
+        
+        arcade.draw_lrbt_rectangle_outline(left, right, bottom, top, arcade.color.WHITE, 2)
+        
+        # Фон поля ввода при активности
+        if self.ip_input_active:
+            arcade.draw_lrbt_rectangle_filled(
+                left + 2, right - 2, bottom + 2, top - 2,
+                arcade.color.DARK_GRAY
+            )
+        
+        # Текст IP-адреса
+        arcade.draw_text(self.ip_input_text, input_center_x, input_center_y - 8,
+                        arcade.color.WHITE, 20, anchor_x="center", anchor_y="center")
+        
+        # Мигающий курсор
+        if self.ip_input_active and self.ip_input_cursor_visible:
+            text_obj = arcade.Text(self.ip_input_text, 0, 0, arcade.color.WHITE, 20)
+            cursor_x = input_center_x + text_obj.content_width / 2 + 5
+            arcade.draw_line(cursor_x, bottom + 15, cursor_x, top - 15, arcade.color.WHITE, 2)
+        
+        arcade.draw_text("Нажмите ENTER для сохранения", SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 100,
+                        arcade.color.LIGHT_GRAY, 16, anchor_x="center")
+        arcade.draw_text("ESC для отмены", SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 130,
+                        arcade.color.DIM_GRAY, 16, anchor_x="center")
+
     def draw_connecting(self):
-        arcade.draw_text("Подключение к серверу...", SCREEN_WIDTH/2, SCREEN_HEIGHT/2,
-                        arcade.color.WHITE, 32, anchor_x="center")
-        arcade.draw_text("Порт: 8000", SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 40,
-                        arcade.color.GRAY, 18, anchor_x="center")
+        arcade.draw_text("Подключение к серверу...", SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 20,
+                        arcade.color.WHITE, 32, anchor_x="center", bold=True)
+        arcade.draw_text(f"{self.server_ip}:{self.server_port}", SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 20,
+                        arcade.color.LIGHT_BLUE, 24, anchor_x="center")
         arcade.draw_text("Нажмите ESC для отмены", SCREEN_WIDTH/2, 50,
                         arcade.color.DIM_GRAY, 16, anchor_x="center")
 
     def draw_waiting(self):
         arcade.draw_text("Ожидание второго игрока...", SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 50,
-                       arcade.color.WHITE, 32, anchor_x="center")
+                       arcade.color.WHITE, 32, anchor_x="center", bold=True)
         arcade.draw_text(f"Игроков: {self.waiting_players}/2", SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 20,
-                       arcade.color.LIGHT_BLUE, 28, anchor_x="center")
+                       arcade.color.LIGHT_BLUE, 28, anchor_x="center", bold=True)
         arcade.draw_text("Нажмите ESC для выхода", SCREEN_WIDTH/2, 50,
                        arcade.color.GRAY, 18, anchor_x="center")
 
     def draw_game(self):
-        # Центральная пунктирная линия (используем современный метод)
+        # Центральная пунктирная линия
         for y in range(0, SCREEN_HEIGHT, 40):
-            # draw_xywh_rectangle_filled: x, y, width, height, color
-            arcade.draw_xywh_rectangle_filled(
-                SCREEN_WIDTH/2 - 2,  # x
-                y + 8,               # y (с центрированием)
-                4,                   # ширина
-                25,                  # высота
+            arcade.draw_lrbt_rectangle_filled(
+                SCREEN_WIDTH/2 - 2,
+                SCREEN_WIDTH/2 + 2,
+                y + 8,
+                y + 33,
                 arcade.color.WHITE
             )
         
+        # Ракетки и мяч
         if self.paddle:
             self.paddle.draw()
         if self.opponent_paddle:
@@ -280,18 +347,27 @@ class PongGame(arcade.Window):
         if self.ball:
             self.ball.draw()
         
+        # Счёт
         arcade.draw_text(str(self.score), SCREEN_WIDTH/4, SCREEN_HEIGHT - 70,
-                       arcade.color.WHITE, 48, anchor_x="center", font_name="Arial")
+                       arcade.color.WHITE, 48, anchor_x="center", font_name="Arial", bold=True)
         arcade.draw_text(str(self.opponent_score), 3*SCREEN_WIDTH/4, SCREEN_HEIGHT - 70,
-                       arcade.color.WHITE, 48, anchor_x="center", font_name="Arial")
+                       arcade.color.WHITE, 48, anchor_x="center", font_name="Arial", bold=True)
         
-        arcade.draw_text("W/S — управление ракеткой", 10, 10,
+        # Подсказка управления
+        arcade.draw_text("W/S — управление ракеткой | ESC — меню", 10, 10,
                        arcade.color.GRAY, 14)
 
     def on_update(self, delta_time):
+        # Мигание курсора
+        self.ip_input_cursor_time += delta_time
+        if self.ip_input_cursor_time > 0.5:
+            self.ip_input_cursor_visible = not self.ip_input_cursor_visible
+            self.ip_input_cursor_time = 0
+        
         if self.game_state != GameState.PLAYING or not self.paddle:
             return
         
+        # Управление ракеткой
         if arcade.key.W in self.keys_pressed:
             self.paddle_dy = self.paddle_speed
         elif arcade.key.S in self.keys_pressed:
@@ -299,9 +375,11 @@ class PongGame(arcade.Window):
         else:
             self.paddle_dy = 0
         
+        # Ограничение движения ракетки в пределах экрана
         self.paddle.center_y += self.paddle_dy
         self.paddle.center_y = max(50, min(SCREEN_HEIGHT - 50, self.paddle.center_y))
         
+        # Отправка позиции на сервер
         if self.sio.connected and self.game_state == GameState.PLAYING:
             self.sio.emit('player_move', {
                 'dy': self.paddle_dy,
@@ -324,6 +402,10 @@ class PongGame(arcade.Window):
                 elif self.menu_selection == 2:
                     self.game_state = GameState.SKIN_SELECT
                 elif self.menu_selection == 3:
+                    self.game_state = GameState.IP_INPUT
+                    self.ip_input_text = self.server_ip
+                    self.ip_input_active = True
+                elif self.menu_selection == 4:
                     self.close()
             elif key == arcade.key.ESCAPE:
                 self.close()
@@ -335,6 +417,23 @@ class PongGame(arcade.Window):
                 self.selected_skin_index = (self.selected_skin_index + 1) % len(self.paddle_skins)
             elif key in [arcade.key.ENTER, arcade.key.ESCAPE]:
                 self.game_state = GameState.MENU
+        
+        elif self.game_state == GameState.IP_INPUT:
+            if key == arcade.key.BACKSPACE:
+                if self.ip_input_text:
+                    self.ip_input_text = self.ip_input_text[:-1]
+            elif key == arcade.key.ENTER:
+                # Валидация IP-адреса
+                if self.validate_ip(self.ip_input_text):
+                    self.server_ip = self.ip_input_text
+                    self.game_state = GameState.MENU
+                    self.ip_input_active = False
+                    self.connection_error = None
+                else:
+                    self.connection_error = "Неверный формат IP"
+            elif key == arcade.key.ESCAPE:
+                self.game_state = GameState.MENU
+                self.ip_input_active = False
         
         elif self.game_state in [GameState.CONNECTING, GameState.WAITING]:
             if key == arcade.key.ESCAPE:
@@ -350,6 +449,24 @@ class PongGame(arcade.Window):
 
     def on_key_release(self, key, modifiers):
         self.keys_pressed.discard(key)
+
+    def on_text(self, text):
+        if self.game_state == GameState.IP_INPUT and self.ip_input_active:
+            # Разрешаем только цифры и точки
+            if text in '0123456789.':
+                # Ограничиваем длину
+                if len(self.ip_input_text) < 15:
+                    self.ip_input_text += text
+
+    def validate_ip(self, ip_str):
+        """Простая валидация IP-адреса"""
+        parts = ip_str.split('.')
+        if len(parts) != 4:
+            return False
+        try:
+            return all(0 <= int(part) <= 255 for part in parts)
+        except ValueError:
+            return False
 
     def reset_game_state(self):
         self.game_state = GameState.MENU
@@ -367,10 +484,21 @@ class PongGame(arcade.Window):
         super().on_close()
 
 def main():
-    print("🚀 Запуск клиента...")
+    print("="*70)
+    print("🚀 ЗАПУСК КЛИЕНТА СЕТЕВОГО ПИН-ПОНГА")
+    print("="*70)
     print("📁 Доступные скины (поместите файлы в папку skins/):")
     print("   paddle_wood.png, paddle_metal.png, paddle_space.png, paddle_fire.png")
-    print("⚠️  Убедитесь, что сервер запущен на порту 8000")
+    print("="*70)
+    print("💡 Как играть по сети:")
+    print("   1. Запустите сервер на одном компьютере (server.py)")
+    print("   2. Запомните его локальный IP (показывается при запуске сервера)")
+    print("   3. На другом устройстве: Меню → Настройки сервера → Введите IP")
+    print("   4. Подключитесь и играйте!")
+    print("="*70)
+    print("🎮 Управление: W/S — движение ракетки | ESC — выход в меню")
+    print("="*70 + "\n")
+    
     window = PongGame()
     arcade.run()
 
